@@ -1,5 +1,4 @@
 #include <linux/kernel.h>
-
 #include <linux/sysfs.h>
 #include <linux/spi/spi.h>
 #include <linux/module.h>
@@ -10,7 +9,8 @@
 #define STSP_TX_MAX_LENGTH 96
 #define STSP_RX_MAX_LENGTH 96
 #define SPI_AUTO_INCREMENT 0x00
-#define ANA_FUNC_CONF1_BASE      ((uint8_t)0x00) /*!< ANA_FUNC_CONF1 Address (R/W) */
+#define ANA_FUNC_CONF1_BASE     ((uint8_t)0x00) /*!< ANA_FUNC_CONF1 Address (R/W) */
+#define	DEVICE_INFO0_VERSION	((uint8_t)(0xF1)) /*!< Device version [7:0]; (0x55 in CUT1.0) */
 #define READY    0x03
 #define MAX_CMD_LEN 1
 
@@ -206,18 +206,28 @@ error:
 
 	return -1;
 }
-/*
-static int stsp_mag_device_power_on(struct stsp_dev *dev)
+static int stsp_hw_init(struct stsp_dev *dev)
 {
 	int err;
-	u8 data = 0x00;
-	printk(KERN_INFO "enter in the u mag device power on\n");
-	err = dev->tf->write(dev, 0x05, 1, &data);
-	return err;
-	printk("%d", err);
-}
+	u8 data;
 
-*/
+	err = dev->tf->read(dev, DEVICE_INFO0_VERSION, 1, &data);
+	printk("probing the function = ravi");
+	if (err < 0)
+	{
+		dev_err(dev->dev, "error reading the version\n");
+		return err;
+	}
+	printk("probbing = %d", err);
+
+	if (data != DEVICE_INFO0_VERSION)
+	{
+		dev_err(dev->dev, "device unknown {0x%02x-0x%02x}\n", DEVICE_INFO0_VERSION, data);
+		return -ENODEV;
+
+	}
+	return err;
+}
 static void remove_sysfs_interfaces(struct device *dev)
 {
 	int i;
@@ -233,14 +243,19 @@ int stsp_mag_probe(struct stsp_dev *dev)
 	int err;
 
 	err = create_sysfs_interfaces(dev->dev);
-	return 1;
+	err = stsp_hw_init(dev);
+	if (err < 0)
+	{
+		dev_err(dev->dev, "hw init failed: %d\n", err);	
+	}
+	return 0; 
 }
 
 int stsp_mag_remove(struct stsp_dev *dev)
 {
 	printk(KERN_INFO "enter in the mag remove function\n");
 	remove_sysfs_interfaces(dev->dev);
-	return 1;
+	return 0;
 
 
 }
